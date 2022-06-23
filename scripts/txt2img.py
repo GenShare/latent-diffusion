@@ -108,6 +108,14 @@ if __name__ == "__main__":
         default="models/ldm/text2img-large/model.ckpt",
         help="path to model's checkpoints file"
     )
+
+    parser.add_argument(
+        "--sqs",
+        type=str,
+        default=None,
+        help="if provided, enters server mode processing this queue"
+    )
+
     opt = parser.parse_args()
 
 
@@ -127,11 +135,32 @@ if __name__ == "__main__":
 
     prompt = opt.prompt
 
-
     sample_path = os.path.join(outpath, "samples")
     os.makedirs(sample_path, exist_ok=True)
     base_count = len(os.listdir(sample_path))
 
+    # check if server mode
+    # TODO: do better
+    if opt.sqs:
+        s3 = boto3.client('s3', region_name=environ['AWS_REGION'])
+        sqs = boto3.client('sqs', region_name=environ['AWS_REGION'])
+
+        threads = [
+                    Thread(target=process_queue, args=(i+1, s3, sqs))
+                    for i in range(int(environ['N_THREADS']))
+                  ]
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+    # TODO: validate that this function call works
+    generate(prompt, model, opt, sample_path, base_count, outpath)
+
+
+def generate(prompt, model, opt, sample_path, base_count, outpath):
     all_samples=list()
     with torch.no_grad():
         with model.ema_scope():
@@ -170,3 +199,44 @@ if __name__ == "__main__":
     Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'{prompt.replace(" ", "-")}.png'))
 
     print(f"Your samples are ready and waiting four you here: \n{outpath} \nEnjoy.")
+
+def process_queue(thread_id, s3, sqs):
+    # TODO: validate that this is working
+    response = sqs.receive_message(QueueUrl=environ['INBOUND_REQUESTS_QUEUE_URL'],)
+    while response:
+        if 'Messages' in response:
+            time_of_last_message_encounter = time.time()
+            for message in response['Messages']:
+                uid, body = message['MessageId'], message['Body']
+                sqs.delete_message(
+                        QueueUrl=environ['INBOUND_REQUESTS_QUEUE_URL'],
+                        ReceiptHandle=message['ReceiptHandle']
+                )
+
+                try:
+                    body = json.loads(body)
+                    prompt = body['prompt']
+                except json.decoder.JSONDecodeError:
+                    logging.info(f'Unable to parse {uid}: "{body}"')
+                    continue
+                except KeyError:
+                    logging.info(f'{uid}: no prompt')
+                    continue
+
+                logging.info(f'RECV {uid}: "{prompt}"')
+
+                # TODO: update to latent_diffusion
+                vqgan_clip(prompt, _path_from_uid(uid))
+
+                # TODO: migrate these non GPU tasks to some daemon
+                upload_file(s3, uid, prompt)
+                delete_file(uid)
+        else:
+            if time.time() - time_of_last_message_encounter < RETRY_TIMEOUT:
+                logging.info('Thread sees no new messages -- sleeping')
+                time.sleep(RETRY_DELAY)
+            else:
+                logging.info('Thread sees no new messages for too long -- quitting')
+                break
+
+        response = sqs.receive_message(QueueUrl=environ['INBOUND_REQUESTS_QUEUE_URL'],)
