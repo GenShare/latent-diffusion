@@ -10,7 +10,6 @@ import time
 from os import environ
 from threading import Thread
 
-# TODO: add these requirements to pyenv
 import boto3
 import botocore
 
@@ -19,9 +18,8 @@ from scripts.txt2img import setup, generate
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 def _path_from_uid(uid: str) -> str:
+    # TODO: also some way to save individual samples
     return f'/artifacts/{uid}.png'
-
-RETRY_DELAY = 10
 
 def process_queue(thread_id, s3, sqs, model, sampler):
     while True:
@@ -48,16 +46,14 @@ def process_queue(thread_id, s3, sqs, model, sampler):
 
                 logging.info(f'RECV {uid}: "{prompt}"')
 
+                # TODO: parse addtl params
+
                 generate(prompt, _path_from_uid(uid), model, sampler, sampledir=None)
-        else:
-            logging.info('Thread sees no new messages -- sleeping')
-            time.sleep(RETRY_DELAY)
 
 def main():
     s3 = boto3.client('s3', region_name=environ['AWS_REGION'])
     sqs = boto3.client('sqs', region_name=environ['AWS_REGION'])
 
-    # TODO: accept environment variables for 
     model, sampler = setup(environ['MODEL_PATH'], False)
 
     threads = [
