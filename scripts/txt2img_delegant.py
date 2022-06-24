@@ -47,8 +47,7 @@ def process_queue(thread_id, s3, sqs, model, sampler):
 
                 logging.info(f'RECV {uid}: "{prompt}"')
 
-                # TODO: update to latent_diffusion
-                generate(prompt, _path_from_uid(uid), sample_path=None)
+                generate(prompt, _path_from_uid(uid), model, sampler, sample_path=None)
         else:
             logging.info('Thread sees no new messages -- sleeping')
             time.sleep(RETRY_DELAY)
