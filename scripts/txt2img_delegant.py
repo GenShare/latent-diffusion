@@ -25,7 +25,8 @@ RETRY_DELAY = 10
 
 def process_queue(thread_id, s3, sqs, model, sampler):
     while True:
-        response = sqs.receive_message(QueueUrl=environ['INBOUND_REQUESTS_QUEUE_URL'],)
+        response = sqs.receive_message(QueueUrl=environ['INBOUND_REQUESTS_QUEUE_URL'],
+                WaitTimeSeconds=20)
 
         if 'Messages' in response:
             for message in response['Messages']:
