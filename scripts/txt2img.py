@@ -43,7 +43,7 @@ def setup(checkpoint, plms):
 
     return model, sampler
 
-def generate(prompt, outpath, model, sampler, sample_path=None,
+def generate(prompt, outfile, model, sampler, sampledir=None,
         ddim_steps=200, ddim_eta=0.0, n_iter=1,
         height=256, width=256,
         n_samples=4, scale=5.0):
@@ -70,13 +70,12 @@ def generate(prompt, outpath, model, sampler, sample_path=None,
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
 
-                if sample_path:
+                if sampledir:
                     for x_sample in x_samples_ddim:
                         x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                        Image.fromarray(x_sample.astype(np.uint8)).save(os.path.join(sample_path, f"{sample_count:04}.png"))
+                        Image.fromarray(x_sample.astype(np.uint8)).save(os.path.join(sampledir, f"{sample_count:04}.png"))
                         sample_count += 1
                 all_samples.append(x_samples_ddim)
-
 
     # additionally, save as grid
     grid = torch.stack(all_samples, 0)
@@ -85,24 +84,22 @@ def generate(prompt, outpath, model, sampler, sample_path=None,
 
     # to image
     grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'{prompt.replace(" ", "-")}.png'))
+    Image.fromarray(grid.astype(np.uint8)).save(outfile)
 
-    print(f"Your samples are ready and waiting four you here: \n{outpath} \nEnjoy.")
+    print(f"Your samples are ready and waiting four you here: \n{outfile} \nEnjoy.")
 
 def main(opt):
     model, sampler = setup(opt.checkpoint, opt.plms)
 
-    os.makedirs(opt.outdir, exist_ok=True)
-    outpath = opt.outdir
-
     prompt = opt.prompt
 
-    sample_path = os.path.join(outpath, "samples")
-    os.makedirs(sample_path, exist_ok=True)
-
     # TODO: validate that this function call works
-    generate(opt.prompt, outpath, model, sampler, sample_path, opt.ddim_steps, opt.ddim_eta, opt.n_iter,
-            opt.H, opt.W, opt.n_samples, opt.scale)
+    generate(opt.prompt, opt.outfile,
+            model, sampler,
+            opt.sampledir,
+            opt.ddim_steps, opt.ddim_eta, opt.n_iter,
+            opt.H, opt.W,
+            opt.n_samples, opt.scale)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -116,12 +113,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--outdir",
+        "--outfile",
         type=str,
         nargs="?",
-        help="dir to write results to",
-        default="outputs/txt2img-samples"
+        help="file to write result to",
     )
+
     parser.add_argument(
         "--ddim_steps",
         type=int,
@@ -182,6 +179,14 @@ if __name__ == "__main__":
         type=str,
         default="models/ldm/text2img-large/model.ckpt",
         help="path to model's checkpoints file"
+    )
+
+    parser.add_argument(
+        "--sampledir",
+        type=str,
+        nargs="?",
+        help="directory to write samples to",
+        default=None
     )
 
     main(parser.parse_args())
