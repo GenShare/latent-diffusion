@@ -19,7 +19,7 @@ from scripts.txt2img import setup, generate
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 def _path_from_uid(uid: str) -> str:
-    return f'/tmp/{uid}.png'
+    return f'/artifacts/{uid}.png'
 
 RETRY_DELAY = 10
 
