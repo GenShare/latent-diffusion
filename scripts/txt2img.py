@@ -130,7 +130,7 @@ if __name__ == "__main__":
     os.makedirs(sample_path, exist_ok=True)
 
     # TODO: validate that this function call works
-    generate(opt.prompt, opt.outdir, opt.ddim_steps, opt.ddim_eta, opt.n_iter,
+    generate(opt.prompt, outpath, sample_path, opt.ddim_steps, opt.ddim_eta, opt.n_iter,
             opt.height, opt.width, opt.n_samples, opt.scale)
 
 def setup(checkpoint, plms):
@@ -147,7 +147,7 @@ def setup(checkpoint, plms):
 
     return model, sampler
 
-def generate(prompt, outpath, sample_path,
+def generate(prompt, outpath, sample_path=None,
         ddim_steps=200, ddim_eta=0.0, n_iter=1,
         height=256, width=256,
         n_samples=4, scale=5.0):
@@ -174,10 +174,11 @@ def generate(prompt, outpath, sample_path,
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
 
-                for x_sample in x_samples_ddim:
-                    x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                    Image.fromarray(x_sample.astype(np.uint8)).save(os.path.join(sample_path, f"{sample_count:04}.png"))
-                    sample_count += 1
+                if sample_path:
+                    for x_sample in x_samples_ddim:
+                        x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                        Image.fromarray(x_sample.astype(np.uint8)).save(os.path.join(sample_path, f"{sample_count:04}.png"))
+                        sample_count += 1
                 all_samples.append(x_samples_ddim)
 
 
