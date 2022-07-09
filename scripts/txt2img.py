@@ -43,7 +43,7 @@ def setup(checkpoint, plms=False):
 
     return {"model": model, "sampler": sampler}
 
-def generate(prompt, model=None, sampler=None,
+def generate(prompt, model, sampler,
         ddim_steps=200, ddim_eta=0.0, n_iter=1,
         height=256, width=256,
         n_samples=4, scale=5.0):
@@ -83,7 +83,7 @@ def main(opt):
     prompt = opt.prompt
 
     generate(opt.prompt,
-            model=model, sampler=sampler,
+            model, sampler,
             opt.sampledir,
             opt.ddim_steps, opt.ddim_eta, opt.n_iter,
             opt.H, opt.W,
