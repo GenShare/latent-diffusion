@@ -45,6 +45,8 @@ class TransformerEmbedder(AbstractEncoder):
     def encode(self, x):
         return self(x)
 
+from threading import Lock
+_tokenizer_lock = Lock()
 
 class BERTTokenizer(AbstractEncoder):
     """ Uses a pretrained BERT tokenizer by huggingface. Vocab size: 30522 (?)"""
@@ -57,8 +59,9 @@ class BERTTokenizer(AbstractEncoder):
         self.max_length = max_length
 
     def forward(self, text):
-        batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
-                                        return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+        with _tokenizer_lock:
+            batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
+                                            return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device)
         return tokens
 
